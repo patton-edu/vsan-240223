@@ -8,16 +8,15 @@
     vcenter_username: "administrator@vsphere.local"
     vcenter_password: "VMware1!"
     datacenter_name: "Datacenter"
-    parent_folder: "1.Internal-Training/Students"
+    parent_folder: "1.Internal-Training/2.vSAN"
     esxi_username: "root"
     esxi_password: "VMware1!"
-    public_net:  "DPG-172.0.10.x"
     datastore_name: "vsanDatastore"
     templateRouterVM: "Temp-vSAN-Router"
 
     SID_ESXi: 
-    - { id: S09, host: 172.0.10.13 }
-    - { id: S10, host: 172.0.10.11 }
+    - { id: S00, host: 172.0.10.13 }
+#    - { id: S10, host: 172.0.10.11 }
 
     Router_VM_NICs:
     - { label: "Network adapter 2", pg: -SA-Trunk }
@@ -50,6 +49,7 @@
       password: "{{ vcenter_password }}"
       validate_certs: no
       datacenter: "{{ datacenter_name }}"
+      folder: "{{ datacenter_name + '/vm/' + parent_folder + '/' + item[0].id }}"
       name: "{{ item[0].id + '-Router' }}"
       network_name: "{{ item[0].id + item[1].pg }}"
       label: "{{ item[1].label }}"
@@ -65,6 +65,7 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: no
+      folder: "{{ datacenter_name + '/vm/' + parent_folder + '/' + item[0].id }}"
       name: "{{ item.id + '-Router' }}"
       state: "poweredon"
     loop: "{{ SID_ESXi }}"        
@@ -84,7 +85,7 @@
       password: '{{ vcenter_password }}'
       validate_certs: 'false'
       datacenter: '{{ datacenter_name }}'
-      folder: "{{ parent_folder + item.id }}"
+      folder: "{{ datacenter_name + '/vm/' + parent_folder + '/' + item[0].id }}"
       vm_id: "{{ item.id + '-Router' }}"
       vm_id_type: vm_name
       vm_username: 'vyos'
@@ -163,3 +164,4 @@
     loop: "{{ SID_ESXi }}"  
     delegate_to: localhost
     register: shell_command_with_wait_timeout
+    
