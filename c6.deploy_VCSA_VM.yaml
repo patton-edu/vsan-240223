@@ -1,0 +1,69 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "172.0.10.10"
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "VMware1!"
+    datacenter_name: "Datacenter"
+    parent_folder: "1.Internal-Training/Students"
+    esxi_username: "root"
+    esxi_password: "VMware1!"    
+    datastore_name: "vsanDatastore"    
+    templateVCSAVM: "Temp-vSAN-VCSA"
+    snapshotName: "Prepared"
+
+    SID_ESXi: 
+    - { id: S09, host: 172.0.10.13 }
+    - { id: S10, host: 172.0.10.11 }
+
+
+  tasks: 
+
+  - name: 26. Deploy vCenter Server Appliance VM from Template
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item.id + '-VCSA' }}"
+      state: "poweredoff"
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item.id }}"
+      esxi_hostname: '{{ item.host }}'
+      datastore: "{{ datastore_name }}"
+      template:  "{{ templateVCSAVM }}"
+      linked_clone: True
+      snapshot_src: "{{ snapshotName }}"
+    loop: "{{ SID_ESXi }}"
+    delegate_to: localhost
+
+
+  - name: 27. Change VCSA VM Network Interfaces
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item.id + '-VCSA' }}"
+      label: "Network adapter 1"
+      network_name: "{{ item.id + '-SA-Mgmt' }}"
+      state: present
+      force: yes
+    loop: "{{ SID_ESXi }}"
+    delegate_to: localhost
+
+
+  - name: 28. Poweron VCSA VM
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item.id + '-VCSA' }}"
+      state: "poweredon"
+      state_change_timeout: 60
+    loop: "{{ SID_ESXi }}"
+    delegate_to: localhost
