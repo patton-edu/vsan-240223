@@ -1,0 +1,229 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "172.0.10.10"
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "VMware1!"
+    datacenter_name: "Datacenter"
+    parent_folder: "1.Internal-Training/Students"
+    esxi_username: "root"
+    esxi_password: "VMware1!"    
+    datastore_name: "vsanDatastore"    
+    templateESXiVM: "Temp-vSAN-ESXi"
+
+    SID_ESXi: 
+    - { id: S09, host: 172.0.10.13 }
+    - { id: S10, host: 172.0.10.11 }
+
+    SA_ESXis_NICs:
+    - { label: Network adapter 1, portgroup: -SA-Mgmt }
+    - { label: Network adapter 2, portgroup: -SA-Mgmt }
+    - { label: Network adapter 3, portgroup: -SA-Trunk }
+    - { label: Network adapter 4, portgroup: -SA-Trunk }
+
+    SA_ESXi_VM_Setup:
+    - { vm: -SA-ESXi-01, hostname: sa-esxi-01, ip: 10.10.10.11 }
+    - { vm: -SA-ESXi-02, hostname: sa-esxi-02, ip: 10.10.10.12 }
+    - { vm: -SA-ESXi-03, hostname: sa-esxi-03, ip: 10.10.10.13 }
+    - { vm: -SA-ESXi-04, hostname: sa-esxi-04, ip: 10.10.10.14 }
+
+
+  tasks: 
+  - name: 15. Clone SiteA ESXi vms from Template
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      state: "poweredoff"     
+      esxi_hostname: '{{ item[0].host }}'
+      datastore: "{{ datastore_name }}"
+      template: "{{ templateESXiVM }}"
+    loop: "{{ SID_ESXi | product(SA_ESXi_VM_Setup) | list }}"      
+    delegate_to: localhost
+
+
+  - name: 16.Change vCPU, vRAM
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      hardware:
+        num_cpus: 2
+        memory_mb: 12288        
+    loop: "{{ SID_ESXi | product(SA_ESXi_VM_Setup) | list }}"
+    delegate_to: localhost
+
+
+  - name: 17.Adding vSAN NVMe Disks
+    community.vmware.vmware_guest_disk:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      disk:
+        - size_gb: 40
+          state: present
+          controller_type: nvme
+          controller_number: 0
+          unit_number: 0
+        - size_gb: 40
+          state: present
+          controller_type: nvme
+          controller_number: 0
+          unit_number: 1
+        - size_gb: 200
+          state: present
+          controller_type: nvme
+          controller_number: 0
+          unit_number: 2
+        - size_gb: 200
+          state: present
+          controller_type: nvme
+          controller_number: 0
+          unit_number: 3
+    loop: "{{ SID_ESXi | product(SA_ESXi_VM_Setup) | list }}"
+    delegate_to: localhost
+
+
+  - name: 18.Adding or Change SA ESXi VMs 1st Network Interfaces
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item[0].id + item[1].vm }}"
+      label: "{{ SA_ESXis_NICs[0].label }}"
+      network_name: "{{ item[0].id + SA_ESXis_NICs[0].portgroup }}"
+      state: present
+      force: yes
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+
+
+  - name: 19.Adding or Change SA ESXi VMs 2nd Network Interfaces
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item[0].id + item[1].vm }}"
+      label: "{{ SA_ESXis_NICs[1].label }}"
+      network_name: "{{ item[0].id + SA_ESXis_NICs[1].portgroup }}"
+      state: present
+      force: yes
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+
+
+  - name: 20.Adding or Change SA ESXi VMs 3rd Network Interfaces
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item[0].id + item[1].vm }}"
+      label: "{{ SA_ESXis_NICs[2].label }}"
+      network_name: "{{ item[0].id + SA_ESXis_NICs[2].portgroup }}"
+      state: present
+      force: yes
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+
+
+  - name: 21.Adding or Change SA ESXi VMs 4rd Network Interfaces
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item[0].id + item[1].vm }}"
+      label: "{{ SA_ESXis_NICs[3].label }}"
+      network_name: "{{ item[0].id + SA_ESXis_NICs[3].portgroup }}"
+      state: present
+      force: yes
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+
+
+  - name: 22.Power on ESXi VMs
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item[0].id + item[1].vm }}"
+      state: "poweredon"
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+  
+
+  - name: 23.Waiting boot-up
+    wait_for:
+      timeout: 120
+    delegate_to: localhost
+
+
+  - name: 24.Configure SiteA ESXi VMs
+    community.vmware.vmware_vm_shell:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: 'false'
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      vm_id: "{{ item[0].id + item[1].vm }}"
+      vm_id_type: vm_name
+      vm_username: 'root'
+      vm_password: 'VMware1!'
+      vm_shell: /bin/sh
+      vm_shell_cwd: "/tmp"
+      vm_shell_args: |
+        echo "Don't remove this line. Write your ESXi configuration commands below."
+        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
+        sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
+        esxcli network vswitch standard uplink add -u vmnic1 -v vSwitch0
+        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g 10.10.10.1
+        esxcli network ip route ipv4 add -n 0.0.0.0 -g 10.10.10.1
+        esxcli network ip dns server add -s 10.10.10.2
+        esxcli system hostname set --host {{ item[1].hostname }}
+        esxcli system hostname set --domain vclass.local
+        esxcli system ntp set -e yes -s 10.10.10.1
+        esxcli system module parameters set -m tcpip4 -p ipv6=0
+        vim-cmd hostsvc/enable_ssh
+        vim-cmd hostsvc/enable_esx_shell
+        vim-cmd hostsvc/datastore/rename datastore1 {{ item[1].hostname }}
+        vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1
+        /sbin/generate-certificates
+        /sbin/auto-backup.sh
+      wait_for_process: True
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+#        esxcli network vswitch standard portgroup set -p 'Management Network' -v 10
+#        esxcli network vswitch standard portgroup set -p 'VM Network' -v 10
+
+
+  - name: 25.Reboot ESXi VM
+    community.vmware.vmware_guest_powerstate:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: 'false'        
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      state: reboot-guest
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+    
