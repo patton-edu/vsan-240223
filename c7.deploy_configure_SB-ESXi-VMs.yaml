@@ -8,15 +8,15 @@
     vcenter_username: "administrator@vsphere.local"
     vcenter_password: "VMware1!"
     datacenter_name: "Datacenter"
-    parent_folder: "1.Internal-Training/Students"
+    parent_folder: "1.Internal-Training/2.vSAN"
     esxi_username: "root"
     esxi_password: "VMware1!"    
     datastore_name: "vsanDatastore"    
     templateESXiVM: "Temp-vSAN-ESXi"
 
     SID_ESXi: 
-    - { id: S09, host: 172.0.10.13 }
-    - { id: S10, host: 172.0.10.11 }
+    - { id: S00, host: 172.0.10.13 }
+#    - { id: S10, host: 172.0.10.11 }
 
     SB_ESXis_NICs:
     - { label: Network adapter 1, portgroup: -SB-Mgmt }
@@ -32,6 +32,160 @@
 
 
   tasks: 
+  - name: 29. Clone SiteB ESXi vms from Template
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      state: "poweredoff"     
+      esxi_hostname: '{{ item[0].host }}'
+      datastore: "{{ datastore_name }}"
+      template: "{{ templateESXiVM }}"
+    loop: "{{ SID_ESXi | product(SB_ESXi_VM_Setup) | list }}"      
+    delegate_to: localhost
+
+
+  - name: 30.Change vCPU, vRAM
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      hardware:
+        num_cpus: 2
+        memory_mb: 12288        
+    loop: "{{ SID_ESXi | product(SB_ESXi_VM_Setup) | list }}"
+    delegate_to: localhost
+
+
+  - name: 31.Adding vSAN NVMe Disks
+    community.vmware.vmware_guest_disk:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      disk:
+        - size_gb: 40
+          state: present
+          controller_type: nvme
+          controller_number: 0
+          unit_number: 0
+        - size_gb: 40
+          state: present
+          controller_type: nvme
+          controller_number: 0
+          unit_number: 1
+        - size_gb: 200
+          state: present
+          controller_type: nvme
+          controller_number: 0
+          unit_number: 2
+        - size_gb: 200
+          state: present
+          controller_type: nvme
+          controller_number: 0
+          unit_number: 3
+    loop: "{{ SID_ESXi | product(SB_ESXi_VM_Setup) | list }}"
+    delegate_to: localhost
+
+
+  - name: 32.Adding or Change SB ESXi VMs 1st Network Interfaces
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      label: "{{ SB_ESXis_NICs[0].label }}"
+      network_name: "{{ item[0].id + SB_ESXis_NICs[0].portgroup }}"
+      state: present
+      force: yes
+    loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+
+
+  - name: 33.Adding or Change SB ESXi VMs 2nd Network Interfaces
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      label: "{{ SB_ESXis_NICs[1].label }}"
+      network_name: "{{ item[0].id + SB_ESXis_NICs[1].portgroup }}"
+      state: present
+      force: yes
+    loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+
+
+  - name: 34.Adding or Change SB ESXi VMs 3rd Network Interfaces
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      label: "{{ SB_ESXis_NICs[2].label }}"
+      network_name: "{{ item[0].id + SB_ESXis_NICs[2].portgroup }}"
+      state: present
+      force: yes
+    loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+
+
+  - name: 35.Adding or Change SB ESXi VMs 4rd Network Interfaces
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      label: "{{ SB_ESXis_NICs[3].label }}"
+      network_name: "{{ item[0].id + SB_ESXis_NICs[3].portgroup }}"
+      state: present
+      force: yes
+    loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+
+
+  - name: 36.Power on ESXi VMs
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      state: "poweredon"
+    loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+  
+
+  - name: 37.Waiting boot-up
+    wait_for:
+      timeout: 120
+    delegate_to: localhost
+
 
   - name: 38.Configure SiteB ESXi VMs
     community.vmware.vmware_vm_shell:
@@ -77,6 +231,7 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: 'false'        
+      datacenter: '{{ datacenter_name }}'
       folder: "{{ parent_folder + '/' + item[0].id }}"
       name: "{{ item[0].id + item[1].vm }}"
       state: reboot-guest
