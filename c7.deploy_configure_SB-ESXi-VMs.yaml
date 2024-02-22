@@ -1,0 +1,85 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "172.0.10.10"
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "VMware1!"
+    datacenter_name: "Datacenter"
+    parent_folder: "1.Internal-Training/Students"
+    esxi_username: "root"
+    esxi_password: "VMware1!"    
+    datastore_name: "vsanDatastore"    
+    templateESXiVM: "Temp-vSAN-ESXi"
+
+    SID_ESXi: 
+    - { id: S09, host: 172.0.10.13 }
+    - { id: S10, host: 172.0.10.11 }
+
+    SB_ESXis_NICs:
+    - { label: Network adapter 1, portgroup: -SB-Mgmt }
+    - { label: Network adapter 2, portgroup: -SB-Mgmt }
+    - { label: Network adapter 3, portgroup: -SB-Trunk }
+    - { label: Network adapter 4, portgroup: -SB-Trunk }
+
+    SB_ESXi_VM_Setup:
+    - { vm: -SB-ESXi-01, hostname: sb-esxi-01, ip: 10.10.20.11 }
+    - { vm: -SB-ESXi-02, hostname: sb-esxi-02, ip: 10.10.20.12 }
+    - { vm: -SB-ESXi-03, hostname: sb-esxi-03, ip: 10.10.20.13 }
+    - { vm: -SB-ESXi-04, hostname: sb-esxi-04, ip: 10.10.20.14 }
+
+
+  tasks: 
+
+  - name: 38.Configure SiteB ESXi VMs
+    community.vmware.vmware_vm_shell:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: 'false'
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      vm_id: "{{ item[0].id + item[1].vm }}"
+      vm_id_type: vm_name
+      vm_username: 'root'
+      vm_password: 'VMware1!'
+      vm_shell: /bin/sh
+      vm_shell_cwd: "/tmp"
+      vm_shell_args: |
+        echo "Don't remove this line. Write your ESXi configuration commands below."
+        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
+        sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
+        esxcli network vswitch standard uplink add -u vmnic1 -v vSwitch0
+        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g 10.10.20.1
+        esxcli network ip route ipv4 add -n 0.0.0.0 -g 10.10.10.1
+        esxcli network ip dns server add -s 10.10.10.2
+        esxcli system hostname set --host {{ item[1].hostname }}
+        esxcli system hostname set --domain vclass.local
+        esxcli system ntp set -e yes -s 10.10.20.1
+        esxcli system module parameters set -m tcpip4 -p ipv6=0
+        vim-cmd hostsvc/enable_ssh
+        vim-cmd hostsvc/enable_esx_shell
+        vim-cmd hostsvc/datastore/rename datastore1 {{ item[1].hostname }}
+        vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1
+        /sbin/generate-certificates
+        /sbin/auto-backup.sh
+      wait_for_process: True
+    loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
+#        esxcli network vswitch standard portgroup set -p 'Management Network' -v 10
+#        esxcli network vswitch standard portgroup set -p 'VM Network' -v 10
+
+
+  - name: 39.Reboot ESXi VM
+    community.vmware.vmware_guest_powerstate:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: 'false'        
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      name: "{{ item[0].id + item[1].vm }}"
+      state: reboot-guest
+    loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
+    delegate_to: localhost
+    
