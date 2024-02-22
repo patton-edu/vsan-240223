@@ -1,0 +1,165 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "172.0.10.10"
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "VMware1!"
+    datacenter_name: "Datacenter"
+    parent_folder: "1.Internal-Training/Students"
+    esxi_username: "root"
+    esxi_password: "VMware1!"
+    public_net:  "DPG-172.0.10.x"
+    datastore_name: "vsanDatastore"
+    templateRouterVM: "Temp-vSAN-Router"
+
+    SID_ESXi: 
+    - { id: S09, host: 172.0.10.13 }
+    - { id: S10, host: 172.0.10.11 }
+
+    Router_VM_NICs:
+    - { label: "Network adapter 2", pg: -SA-Trunk }
+    - { label: "Network adapter 3", pg: -SB-Trunk }
+    - { label: "Network adapter 4", pg: -SC-Trunk }
+
+
+  tasks: 
+  - name: 07. Deploy SW Router for LAB
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item.id + '-Router' }}"
+      state: "poweredoff"
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ datacenter_name + '/vm/' + parent_folder + '/' + item.id }}"
+      esxi_hostname: '{{ item.host }}'
+      datastore: "{{ datastore_name }}"
+      template: "{{ templateRouterVM }}"
+    loop: "{{ SID_ESXi }}"  
+    delegate_to: localhost
+
+
+  - name: 08.Change SW Router Network
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      name: "{{ item[0].id + '-Router' }}"
+      network_name: "{{ item[0].id + item[1].pg }}"
+      label: "{{ item[1].label }}"
+      state: present
+    loop: "{{ SID_ESXi | product(Router_VM_NICs) | list }}"
+    delegate_to: localhost
+
+
+
+  - name: 09.Poweron SW Router VM
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item.id + '-Router' }}"
+      state: "poweredon"
+    loop: "{{ SID_ESXi }}"        
+    delegate_to: localhost
+
+
+  - name: 10.Waiting 60 seconds for completing bootup
+    wait_for:
+      timeout: 60
+    delegate_to: localhost
+
+
+  - name: 11.Configure SW Router
+    community.vmware.vmware_vm_shell:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: 'false'
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + item.id }}"
+      vm_id: "{{ item.id + '-Router' }}"
+      vm_id_type: vm_name
+      vm_username: 'vyos'
+      vm_password: 'vyos'
+      vm_shell: /bin/vbash
+      vm_shell_cwd: "/tmp"
+      vm_shell_args: |-
+        -c "source /opt/vyatta/etc/functions/script-template
+        configure
+
+        set interfaces ethernet eth0 description Outside
+        set interfaces ethernet eth0 address dhcp
+        set interfaces ethernet eth0 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth1 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth1 vif 10 description 'VLAN 10 - Site A Management'
+        set interfaces ethernet eth1 vif 10 address 10.10.10.1/24
+        set interfaces ethernet eth1 vif 10 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth1 vif 11 description 'VLAN 11 - Site A vSAN'
+        set interfaces ethernet eth1 vif 11 address 10.10.11.1/24
+        set interfaces ethernet eth1 vif 11 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth1 vif 12 description 'VLAN 12 - Site A vMotion'
+        set interfaces ethernet eth1 vif 12 address 10.10.12.1/24
+        set interfaces ethernet eth1 vif 12 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth1 vif 13 description 'VLAN 13 - Site A Production'
+        set interfaces ethernet eth1 vif 13 address 10.10.13.1/24
+        set interfaces ethernet eth1 vif 13 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth2 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth2 vif 20 description 'VLAN 20 - Site B Management'
+        set interfaces ethernet eth2 vif 20 address 10.10.20.1/24
+        set interfaces ethernet eth2 vif 20 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth2 vif 21 description 'VLAN 21 - Site B vSAN'
+        set interfaces ethernet eth2 vif 21 address 10.10.21.1/24
+        set interfaces ethernet eth2 vif 21 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth2 vif 22 description 'VLAN 22 - Site B vMotion'
+        set interfaces ethernet eth2 vif 22 address 10.10.22.1/24
+        set interfaces ethernet eth2 vif 22 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth2 vif 23 description 'VLAN 23 - Site B Production'
+        set interfaces ethernet eth2 vif 23 address 10.10.23.1/24
+        set interfaces ethernet eth2 vif 23 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth3 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth3 vif 30 description 'VLAN 30 - SiteC Management'
+        set interfaces ethernet eth3 vif 30 address 10.10.30.1/24
+        set interfaces ethernet eth3 vif 30 ipv6 address no-default-link-local
+
+        set interfaces ethernet eth3 vif 31 description 'VLAN 31 - SiteC vSAN'
+        set interfaces ethernet eth3 vif 31 address 10.10.31.1/24
+        set interfaces ethernet eth3 vif 31 ipv6 address no-default-link-local
+
+        set protocols static route 0.0.0.0/0 next-hop 172.0.10.1
+
+        set nat source rule 10 outbound-interface eth0
+        set nat source rule 10 source address 10.10.10.0/24
+        set nat source rule 10 translation address masquerade
+
+        set system name-server 172.0.10.2
+        set system ntp server kr.pool.ntp.org
+
+        set service ssh port 22
+            
+        commit
+        save"
+      wait_for_process: True
+      timeout: 180
+    loop: "{{ SID_ESXi }}"  
+    delegate_to: localhost
+    register: shell_command_with_wait_timeout
