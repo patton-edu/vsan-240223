@@ -8,7 +8,7 @@
     vcenter_username: "administrator@vsphere.local"
     vcenter_password: "VMware1!"
     datacenter_name: "Datacenter"
-    parent_folder: "1.Internal-Training/Students"
+    parent_folder: "1.Internal-Training/2.vSAN"
     esxi_username: "root"
     esxi_password: "VMware1!"    
     datastore_name: "vsanDatastore"    
@@ -105,6 +105,8 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: no
+      datacenter: "{{ datacenter_name }}"      
+      folder: "{{ parent_folder + '/' + item[0].id }}"      
       name: "{{ item[0].id + item[1].vm }}"
       label: "{{ SA_ESXis_NICs[0].label }}"
       network_name: "{{ item[0].id + SA_ESXis_NICs[0].portgroup }}"
@@ -120,6 +122,8 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: no
+      datacenter: "{{ datacenter_name }}"      
+      folder: "{{ parent_folder + '/' + item[0].id }}"      
       name: "{{ item[0].id + item[1].vm }}"
       label: "{{ SA_ESXis_NICs[1].label }}"
       network_name: "{{ item[0].id + SA_ESXis_NICs[1].portgroup }}"
@@ -135,6 +139,8 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: no
+      datacenter: "{{ datacenter_name }}"      
+      folder: "{{ parent_folder + '/' + item[0].id }}"      
       name: "{{ item[0].id + item[1].vm }}"
       label: "{{ SA_ESXis_NICs[2].label }}"
       network_name: "{{ item[0].id + SA_ESXis_NICs[2].portgroup }}"
@@ -150,6 +156,8 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: no
+      datacenter: "{{ datacenter_name }}"      
+      folder: "{{ parent_folder + '/' + item[0].id }}"      
       name: "{{ item[0].id + item[1].vm }}"
       label: "{{ SA_ESXis_NICs[3].label }}"
       network_name: "{{ item[0].id + SA_ESXis_NICs[3].portgroup }}"
@@ -165,6 +173,8 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: no
+      datacenter: "{{ datacenter_name }}"      
+      folder: "{{ parent_folder + '/' + item[0].id }}"      
       name: "{{ item[0].id + item[1].vm }}"
       state: "poweredon"
     loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
@@ -221,7 +231,8 @@
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: 'false'        
-      folder: "{{ parent_folder + '/' + item[0].id }}"
+      datacenter: "{{ datacenter_name }}"      
+      folder: "{{ parent_folder + '/' + item[0].id }}"      
       name: "{{ item[0].id + item[1].vm }}"
       state: reboot-guest
     loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
