@@ -1,0 +1,67 @@
+---
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "172.0.10.10"
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "VMware1!"
+    datacenter_name: "Datacenter"
+    parent_folder: "1.Internal-Training/Students"
+    esxi_username: "root"
+    esxi_password: "VMware1!"
+    datastore_name: "vsanDatastore"
+    templateDCVM: "Temp-vSAN-DC"
+    snapshot_name: "Prepared"
+
+    SID_ESXi: 
+    - { id: S09, host: 172.0.10.13 }
+    - { id: S10, host: 172.0.10.11 }
+
+  tasks: 
+  - name: 12. Deploy Domain Controller VM
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item.id + '-DC' }}"
+      state: "poweredoff"
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ datacenter_name + '/vm/' + parent_folder + '/' + item.id }}"
+      esxi_hostname: '{{ item.host }}'
+      datastore: "{{ datastore_name }}"
+      template: "{{ templateDCVM }}"
+      linked_clone: True
+      snapshot_src: "{{ snapshot_name }}"      
+    loop: "{{ SID_ESXi }}"  
+    delegate_to: localhost
+
+
+  - name: 13.Change DC VM Network
+    community.vmware.vmware_guest_network:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      datacenter: "{{ datacenter_name }}"
+      name: "{{ item.id + '-DC' }}"
+      network_name: "{{ item.id + '-SA-Mgmt' }}"
+      label: "Network adapter 1"
+      state: present
+    loop: "{{ SID_ESXi }}"
+    delegate_to: localhost
+
+
+  - name: 14.Poweron DC VM
+    community.vmware.vmware_guest:
+      hostname: "{{ vcenter_hostname }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      validate_certs: no
+      name: "{{ item.id + '-DC' }}"
+      state: "poweredon"
+    loop: "{{ SID_ESXi }}"        
+    delegate_to: localhost
+
