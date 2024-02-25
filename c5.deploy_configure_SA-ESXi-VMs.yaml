@@ -248,24 +248,7 @@
     loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
 
 
-  - name: 27.Change SiteA ESXi Configuration Commit
-    community.vmware.vmware_vm_shell:
-      hostname: '{{ vcenter_hostname }}'
-      username: '{{ vcenter_username }}'
-      password: '{{ vcenter_password }}'
-      validate_certs: 'false'
-      datacenter: '{{ datacenter_name }}'
-      folder: "{{ parent_folder + '/' + item[0].id }}"
-      vm_id: "{{ item[0].id + item[1].vm }}"
-      vm_id_type: vm_name
-      vm_username: 'root'
-      vm_password: 'VMware1!'
-      vm_shell: '/sbin/auto-backup.sh'
-      wait_for_process: True
-    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
-
-
-  - name: 28.Reboot ESXi VM
+  - name: 27.Reboot ESXi VM
     community.vmware.vmware_guest_powerstate:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
