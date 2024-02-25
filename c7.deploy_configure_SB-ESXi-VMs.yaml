@@ -25,14 +25,14 @@
     - { label: Network adapter 4, portgroup: -SB-Trunk }
 
     SB_ESXi_VM_Setup:
-    - { vm: -SB-ESXi-01, hostname: sb-esxi-01, ip: 10.10.20.11 }
-    - { vm: -SB-ESXi-02, hostname: sb-esxi-02, ip: 10.10.20.12 }
-    - { vm: -SB-ESXi-03, hostname: sb-esxi-03, ip: 10.10.20.13 }
-    - { vm: -SB-ESXi-04, hostname: sb-esxi-04, ip: 10.10.20.14 }
+    - { vm: -SB-ESXi-01, hostname: sb-esxi-01, ip: 10.10.20.11, gw: 10.10.20.1 }
+    - { vm: -SB-ESXi-02, hostname: sb-esxi-02, ip: 10.10.20.12, gw: 10.10.20.1 }
+    - { vm: -SB-ESXi-03, hostname: sb-esxi-03, ip: 10.10.20.13, gw: 10.10.20.1 }
+    - { vm: -SB-ESXi-04, hostname: sb-esxi-04, ip: 10.10.20.14, gw: 10.10.20.1 }
 
 
   tasks: 
-  - name: 29. Clone SiteB ESXi vms from Template
+  - name: 31. Clone SiteB ESXi vms from Template
     community.vmware.vmware_guest:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -49,7 +49,7 @@
     delegate_to: localhost
 
 
-  - name: 30.Change vCPU, vRAM
+  - name: 32.Change vCPU, vRAM
     community.vmware.vmware_guest:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -65,7 +65,7 @@
     delegate_to: localhost
 
 
-  - name: 31.Adding vSAN NVMe Disks
+  - name: 33.Adding vSAN NVMe Disks
     community.vmware.vmware_guest_disk:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -99,7 +99,7 @@
     delegate_to: localhost
 
 
-  - name: 32.Adding or Change SB ESXi VMs 1st Network Interfaces
+  - name: 34.Adding or Change SB ESXi VMs 1st Network Interfaces
     community.vmware.vmware_guest_network:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -116,7 +116,7 @@
     delegate_to: localhost
 
 
-  - name: 33.Adding or Change SB ESXi VMs 2nd Network Interfaces
+  - name: 35.Adding or Change SB ESXi VMs 2nd Network Interfaces
     community.vmware.vmware_guest_network:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -133,7 +133,7 @@
     delegate_to: localhost
 
 
-  - name: 34.Adding or Change SB ESXi VMs 3rd Network Interfaces
+  - name: 36.Adding or Change SB ESXi VMs 3rd Network Interfaces
     community.vmware.vmware_guest_network:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -150,7 +150,7 @@
     delegate_to: localhost
 
 
-  - name: 35.Adding or Change SB ESXi VMs 4rd Network Interfaces
+  - name: 37.Adding or Change SB ESXi VMs 4rd Network Interfaces
     community.vmware.vmware_guest_network:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -167,7 +167,7 @@
     delegate_to: localhost
 
 
-  - name: 36.Power on ESXi VMs
+  - name: 38.Power on ESXi VMs
     community.vmware.vmware_guest:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -181,7 +181,7 @@
     delegate_to: localhost
   
 
-  - name: 37.Waiting boot-up
+  - name: 39.Waiting boot-up
     wait_for:
       timeout: 120
     delegate_to: localhost
@@ -213,25 +213,6 @@
         /sbin/auto-backup.sh
       wait_for_process: True
     loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
-#        esxcli network vswitch standard portgroup set -p 'Management Network' -v 10
-#        esxcli network vswitch standard portgroup set -p 'VM Network' -v 10
-#        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
-#        sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
-#        esxcli network vswitch standard uplink add -u vmnic1 -v vSwitch0
-#        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g 10.10.20.1
-#        esxcli network ip route ipv4 add -n 0.0.0.0 -g 10.10.10.1
-#        esxcli network ip dns server add -s 10.10.10.2
-#        esxcli system hostname set --host {{ item[1].hostname }}
-#        esxcli system hostname set --domain vclass.local
-#        esxcli system ntp set -e yes -s 10.10.20.1
-#        esxcli system module parameters set -m tcpip4 -p ipv6=0
-#        vim-cmd hostsvc/enable_ssh
-#        vim-cmd hostsvc/enable_esx_shell
-#        vim-cmd hostsvc/datastore/rename datastore1 {{ item[1].hostname }}
-#        vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1
-#        /sbin/generate-certificates
-#        /sbin/auto-backup.sh
-
 
   - name: 39.Reboot ESXi VM
     community.vmware.vmware_guest_powerstate:
