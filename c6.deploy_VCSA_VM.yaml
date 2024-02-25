@@ -22,7 +22,7 @@
 
   tasks: 
 
-  - name: 26. Deploy vCenter Server Appliance VM from Template
+  - name: 28. Deploy vCenter Server Appliance VM from Template
     community.vmware.vmware_guest:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -41,7 +41,7 @@
     delegate_to: localhost
 
 
-  - name: 27. Change VCSA VM Network Interfaces
+  - name: 29. Change VCSA VM Network Interfaces
     community.vmware.vmware_guest_network:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
@@ -58,7 +58,7 @@
     delegate_to: localhost
 
 
-  - name: 28. Poweron VCSA VM
+  - name: 30. Poweron VCSA VM
     community.vmware.vmware_guest:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
