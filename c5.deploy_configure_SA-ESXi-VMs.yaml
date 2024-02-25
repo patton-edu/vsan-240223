@@ -25,10 +25,10 @@
     - { label: Network adapter 4, portgroup: -SA-Trunk }
 
     SA_ESXi_VM_Setup:
-    - { vm: -SA-ESXi-01, hostname: sa-esxi-01, ip: 10.10.10.11 }
-    - { vm: -SA-ESXi-02, hostname: sa-esxi-02, ip: 10.10.10.12 }
-    - { vm: -SA-ESXi-03, hostname: sa-esxi-03, ip: 10.10.10.13 }
-    - { vm: -SA-ESXi-04, hostname: sa-esxi-04, ip: 10.10.10.14 }
+    - { vm: -SA-ESXi-01, hostname: sa-esxi-01, ip: 10.10.10.11, gw: 10.10.10.1 }
+    - { vm: -SA-ESXi-02, hostname: sa-esxi-02, ip: 10.10.10.12, gw: 10.10.10.1 }
+    - { vm: -SA-ESXi-03, hostname: sa-esxi-03, ip: 10.10.10.13, gw: 10.10.10.1 }
+    - { vm: -SA-ESXi-04, hostname: sa-esxi-04, ip: 10.10.10.14, gw: 10.10.10.1 }
 
 
   tasks: 
@@ -187,7 +187,7 @@
     delegate_to: localhost
 
 
-  - name: 24.Configure SiteA ESXi VMs
+  - name: 24.Configure SiteA ESXi Network
     community.vmware.vmware_vm_shell:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -200,35 +200,72 @@
       vm_username: 'root'
       vm_password: 'VMware1!'
       vm_shell: /bin/sh
-      vm_shell_cwd: "/tmp"
       vm_shell_args: |
-        echo "Don't remove this line. Write your ESXi configuration commands below."
-        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g 10.10.10.1
-        esxcli network ip route ipv4 add -n 0.0.0.0 -g 10.10.10.1
+        esxcli network vswitch standard uplink add -u vmnic1 -v vSwitch0
+        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
+        esxcli network ip route ipv4 add -n 0.0.0.0 -g {{ item[1].gw }}
+        esxcli network ip dns server add -s 10.10.10.2
         esxcli system hostname set --host {{ item[1].hostname }}
-        vim-cmd hostsvc/datastore/rename datastore1 {{ item[1].hostname }}
+        esxcli system hostname set --domain vclass.local
+        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
       wait_for_process: True
     loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
-#        esxcli network vswitch standard portgroup set -p 'Management Network' -v 10
-#        esxcli network vswitch standard portgroup set -p 'VM Network' -v 10
-#        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
-#        sed -i 's#/system/uuid.*##' /etc/vmware/esx.conf
-#        esxcli network vswitch standard uplink add -u vmnic1 -v vSwitch0
-#        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g 10.10.10.1
-#        esxcli network ip route ipv4 add -n 0.0.0.0 -g 10.10.10.1
-#        esxcli network ip dns server add -s 10.10.10.2
-#        esxcli system hostname set --host {{ item[1].hostname }}
-#        esxcli system hostname set --domain vclass.local
-#        esxcli system ntp set -e yes -s 10.10.10.1
-#        esxcli system module parameters set -m tcpip4 -p ipv6=0
-#        vim-cmd hostsvc/enable_ssh
-#        vim-cmd hostsvc/enable_esx_shell
-#        vim-cmd hostsvc/datastore/rename datastore1 {{ item[1].hostname }}
-#        vim-cmd hostsvc/advopt/update UserVars.SuppressShellWarning long 1
-#        /sbin/generate-certificates
-#        /sbin/auto-backup.sh
 
-  - name: 25.Reboot ESXi VM
+
+  - name: 25.Change SiteA ESXi UUID
+    community.vmware.vmware_vm_shell:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: 'false'
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      vm_id: "{{ item[0].id + item[1].vm }}"
+      vm_id_type: vm_name
+      vm_username: 'root'
+      vm_password: 'VMware1!'
+      vm_shell: '/bin/sed'
+      vm_shell_args: |
+        -i 's#/system/uuid.*##' /etc/vmware/esx.conf      
+      wait_for_process: True
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+
+
+  - name: 26.Change SiteA ESXi SSL Certificate
+    community.vmware.vmware_vm_shell:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: 'false'
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      vm_id: "{{ item[0].id + item[1].vm }}"
+      vm_id_type: vm_name
+      vm_username: 'root'
+      vm_password: 'VMware1!'
+      vm_shell: '/sbin/generate-certificates'
+      wait_for_process: True
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+
+
+  - name: 27.Change SiteA ESXi Configuration Commit
+    community.vmware.vmware_vm_shell:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: 'false'
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      vm_id: "{{ item[0].id + item[1].vm }}"
+      vm_id_type: vm_name
+      vm_username: 'root'
+      vm_password: 'VMware1!'
+      vm_shell: '/sbin/auto-backup.sh'
+      wait_for_process: True
+    loop: "{{ (SID_ESXi | product(SA_ESXi_VM_Setup) | list) }}"  
+
+
+  - name: 28.Reboot ESXi VM
     community.vmware.vmware_guest_powerstate:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
