@@ -187,7 +187,7 @@
     delegate_to: localhost
 
 
-  - name: 38.Configure SiteB ESXi VMs
+  - name: 38.Configure SiteB ESXi Network
     community.vmware.vmware_vm_shell:
       hostname: '{{ vcenter_hostname }}'
       username: '{{ vcenter_username }}'
@@ -200,28 +200,62 @@
       vm_username: 'root'
       vm_password: 'VMware1!'
       vm_shell: /bin/sh
-      vm_shell_cwd: "/tmp"
       vm_shell_args: |
-        echo "Don't remove this line. Write your ESXi configuration commands below."
-        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g 10.10.20.1
-        esxcli network ip route ipv4 add -n 0.0.0.0 -g 10.10.20.1
+        esxcli network vswitch standard uplink add -u vmnic1 -v vSwitch0
+        esxcli network ip interface ipv4 set -i vmk0 -t static -I {{ item[1].ip }} -N 255.255.255.0 -g {{ item[1].gw }}
+        esxcli network ip route ipv4 add -n 0.0.0.0 -g {{ item[1].gw }}
         esxcli network ip dns server add -s 10.10.10.2
         esxcli system hostname set --host {{ item[1].hostname }}
         esxcli system hostname set --domain vclass.local
-        vim-cmd hostsvc/datastore/rename datastore1 {{ item[1].hostname }}
-        /sbin/generate-certificates
-        /sbin/auto-backup.sh
+        esxcli system settings advanced set -o /Net/FollowHardwareMac -i 1
       wait_for_process: True
     loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
 
-  - name: 39.Reboot ESXi VM
+
+  - name: 39.Change SiteB ESXi UUID
+    community.vmware.vmware_vm_shell:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: 'false'
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      vm_id: "{{ item[0].id + item[1].vm }}"
+      vm_id_type: vm_name
+      vm_username: 'root'
+      vm_password: 'VMware1!'
+      vm_shell: '/bin/sed'
+      vm_shell_args: |
+        -i 's#/system/uuid.*##' /etc/vmware/esx.conf      
+      wait_for_process: True
+    loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
+
+
+  - name: 40.Change SiteB ESXi SSL Certificate
+    community.vmware.vmware_vm_shell:
+      hostname: '{{ vcenter_hostname }}'
+      username: '{{ vcenter_username }}'
+      password: '{{ vcenter_password }}'
+      validate_certs: 'false'
+      datacenter: '{{ datacenter_name }}'
+      folder: "{{ parent_folder + '/' + item[0].id }}"
+      vm_id: "{{ item[0].id + item[1].vm }}"
+      vm_id_type: vm_name
+      vm_username: 'root'
+      vm_password: 'VMware1!'
+      vm_shell: '/sbin/generate-certificates'
+      wait_for_process: True
+    loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
+
+
+  - name: 41.Reboot ESXi VM
     community.vmware.vmware_guest_powerstate:
       hostname: "{{ vcenter_hostname }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       validate_certs: 'false'        
-      datacenter: '{{ datacenter_name }}'
-      folder: "{{ parent_folder + '/' + item[0].id }}"
+      datacenter: "{{ datacenter_name }}"      
+      folder: "{{ parent_folder + '/' + item[0].id }}"      
       name: "{{ item[0].id + item[1].vm }}"
       state: reboot-guest
     loop: "{{ (SID_ESXi | product(SB_ESXi_VM_Setup) | list) }}"  
