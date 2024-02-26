@@ -60,7 +60,7 @@
       name: "{{ item[0].id + item[1].vm }}"
       hardware:
         num_cpus: 2
-        memory_mb: 12288        
+        memory_mb: 16384
     loop: "{{ SID_ESXi | product(SA_ESXi_VM_Setup) | list }}"
     delegate_to: localhost
 
