@@ -11,6 +11,16 @@
     cluster_name: "SiteA"
     esxi_username: "root"
     esxi_password: "VMware1!"
+    SiteA_vSAN_Cluster:
+    - { host: sa-esxi-01.vclass.local, vsanip: 10.10.11.11, vmotionip: 10.10.12.11 }
+    - { host: sa-esxi-02.vclass.local, vsanip: 10.10.11.12, vmotionip: 10.10.12.12 }
+    - { host: sa-esxi-03.vclass.local, vsanip: 10.10.11.13, vmotionip: 10.10.12.13 }
+    - { host: sa-esxi-04.vclass.local, vsanip: 10.10.11.14, vmotionip: 10.10.12.14 }
+    DSwitch_SA_PG:
+    - { pgname: DPG-SA-vSAN, vlan: 11 }
+    - { pgname: DPG-SA-vMotion, vlan: 12 }
+    - { pgname: DPG-SA-Prod, vlan: 13 }
+    
 
   tasks: 
     - name: 01.Create Datacenter
@@ -41,14 +51,11 @@
         validate_certs: no
         datacenter_name: '{{ datacenter_name }}'
         cluster_name: '{{ cluster_name }}'
-        esxi_hostname: '{{ item }}'
+        esxi_hostname: '{{ item.host }}'
         esxi_username: 'root'
         esxi_password: 'VMware1!'
         state: present
-      loop:
-        - "sa-esxi-01.vclass.local"
-        - "sa-esxi-02.vclass.local"
-        - "sa-esxi-03.vclass.local"
+      loop: SiteA_vSAN_Cluster
       delegate_to: localhost
 
     - name: 04.Create dvSwitch
@@ -59,7 +66,7 @@
         validate_certs: no
         datacenter: '{{ datacenter_name }}'
         switch: DSwitch
-        version: 7.0.3
+        version: 8.0.0
         uplink_quantity: 2
         state: present
       delegate_to: localhost
@@ -70,61 +77,32 @@
         username: '{{ vcenter_username }}'
         password: '{{ vcenter_password }}'
         validate_certs: no        
-        esxi_hostname: '{{ item }}'
+        esxi_hostname: '{{ item.host }}'
         switch_name: DSwitch
         vmnics:
           - vmnic2
           - vmnic3
         state: present
-      loop:
-        - "sa-esxi-01.vclass.local"
-        - "sa-esxi-02.vclass.local"
-        - "sa-esxi-03.vclass.local"
+      loop: SiteA_vSAN_Cluster
       delegate_to: localhost
 
 
-    - name: 06.Create Distributed Port Group for Site A vSAN
+    - name: 06.Create Distributed Port Group for Site A
       community.vmware.vmware_dvs_portgroup:
         hostname: '{{ vcenter_hostname }}'
         username: '{{ vcenter_username }}'
         password: '{{ vcenter_password }}'
         validate_certs: no        
-        portgroup_name: DPG-SA-vSAN
+        portgroup_name: '{{ item.pgname }}'
         switch_name: DSwitch
-        vlan_id: 11
+        vlan_id: '{{ item.vlan }}'
         port_binding: static
         state: present
+      loop: DSwitch_SA_PG  
       delegate_to: localhost
 
 
-    - name: 07.Create Distributed Port Group for Site A vMotion
-      community.vmware.vmware_dvs_portgroup:
-        hostname: '{{ vcenter_hostname }}'
-        username: '{{ vcenter_username }}'
-        password: '{{ vcenter_password }}'
-        validate_certs: no        
-        portgroup_name: DPG-SA-vMotion
-        switch_name: DSwitch
-        vlan_id: 12
-        port_binding: static
-        state: present
-      delegate_to: localhost
-
-    - name: 08.Create Distributed Port Group for Site A Production
-      community.vmware.vmware_dvs_portgroup:
-        hostname: '{{ vcenter_hostname }}'
-        username: '{{ vcenter_username }}'
-        password: '{{ vcenter_password }}'
-        validate_certs: no        
-        portgroup_name: DPG-SA-Prod
-        switch_name: DSwitch
-        vlan_id: 13
-        port_binding: static
-        state: present
-      delegate_to: localhost
-
-
-    - name: 09.Add vSAN vmkernel adpater
+    - name: 07.Add vSAN vmkernel adpater
       community.vmware.vmware_vmkernel:
         hostname: '{{ vcenter_hostname }}'
         username: '{{ vcenter_username }}'
@@ -139,14 +117,11 @@
           subnet_mask: 255.255.255.0
         state: present
         enable_vsan: yes
-      loop:
-      - { host: sa-esxi-01.vclass.local, vsanip: 10.10.100.11 }
-      - { host: sa-esxi-02.vclass.local, vsanip: 10.10.100.12 }
-      - { host: sa-esxi-03.vclass.local, vsanip: 10.10.100.13 }
+      loop: SiteA_vSAN_Cluster:
       delegate_to: localhost
 
 
-    - name: 10.Add vMotion vmkernel port
+    - name: 08.Add vMotion vmkernel port
       community.vmware.vmware_vmkernel:
         hostname: '{{ vcenter_hostname }}'
         username: '{{ vcenter_username }}'
@@ -162,30 +137,24 @@
           tcpip_stack: vmotion
         state: present
         enable_vmotion: yes
-      loop:
-      - { host: sa-esxi-01.vclass.local, vmotionip: 10.10.12.11 }
-      - { host: sa-esxi-02.vclass.local, vmotionip: 10.10.12.12 }
-      - { host: sa-esxi-03.vclass.local, vmotionip: 10.10.12.13 }
+      loop: SiteA_vSAN_Cluster:
       delegate_to: localhost
 
 
-    - name: 11.vmoption tcp/ip stack gateway
+    - name: 09.vmoption tcp/ip stack gateway
       community.vmware.vmware_host_tcpip_stacks:
-        hostname: '{{ item }}'
+        hostname: '{{ item.host }}'
         username: '{{ esxi_username }}'
         password: '{{ esxi_password }}'
         validate_certs: no
-        esxi_hostname: '{{ item }}'        
+        esxi_hostname: '{{ item.host }}'        
         vmotion:
           gateway: 10.10.12.1
-      loop:
-        - "sa-esxi-01.vclass.local"
-        - "sa-esxi-02.vclass.local"
-        - "sa-esxi-03.vclass.local"
+      loop: SiteA_vSAN_Cluster:
       delegate_to: localhost    
 
 
-    - name: 12.Enable vSAN
+    - name: 10.Enable vSAN
       community.vmware.vmware_cluster_vsan:
         hostname: '{{ vcenter_hostname }}'
         username: '{{ vcenter_username }}'
