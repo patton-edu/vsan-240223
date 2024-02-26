@@ -55,7 +55,7 @@
         esxi_username: 'root'
         esxi_password: 'VMware1!'
         state: present
-      loop: SiteA_vSAN_Cluster
+      loop: "{{ SiteA_vSAN_Cluster }}"
       delegate_to: localhost
 
     - name: 04.Create dvSwitch
@@ -83,7 +83,7 @@
           - vmnic2
           - vmnic3
         state: present
-      loop: SiteA_vSAN_Cluster
+      loop: "{{ SiteA_vSAN_Cluster }}"
       delegate_to: localhost
 
 
@@ -98,7 +98,7 @@
         vlan_id: '{{ item.vlan }}'
         port_binding: static
         state: present
-      loop: DSwitch_SA_PG  
+      loop: "{{ DSwitch_SA_PG }}"      
       delegate_to: localhost
 
 
@@ -117,7 +117,7 @@
           subnet_mask: 255.255.255.0
         state: present
         enable_vsan: yes
-      loop: SiteA_vSAN_Cluster:
+      loop: "{{ SiteA_vSAN_Cluster }}"
       delegate_to: localhost
 
 
@@ -137,7 +137,7 @@
           tcpip_stack: vmotion
         state: present
         enable_vmotion: yes
-      loop: SiteA_vSAN_Cluster:
+      loop: "{{ SiteA_vSAN_Cluster }}"
       delegate_to: localhost
 
 
@@ -150,7 +150,7 @@
         esxi_hostname: '{{ item.host }}'        
         vmotion:
           gateway: 10.10.12.1
-      loop: SiteA_vSAN_Cluster:
+      loop: "{{ SiteA_vSAN_Cluster }}"
       delegate_to: localhost    
 
 
