@@ -163,5 +163,6 @@
         datacenter_name: '{{ datacenter_name }}'
         cluster_name: '{{ cluster_name }}'
         enable: true
+        vsan_auto_claim_storage: true
       delegate_to: localhost
       
