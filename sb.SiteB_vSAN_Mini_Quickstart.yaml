@@ -1,0 +1,144 @@
+---
+- name : vSAN Mini Quickstart - Site B
+  hosts: localhost
+
+  vars:
+    ansible_python_interpreter: /bin/python3
+    vcenter_hostname: "10.10.10.10"
+    vcenter_username: "administrator@vsphere.local"
+    vcenter_password: "VMware1!"
+    datacenter_name: "Datacenter"
+    cluster_name: "SiteB"
+    esxi_username: "root"
+    esxi_password: "VMware1!"
+    SiteB_vSAN_Cluster:
+    - { host: sb-esxi-01.vclass.local, vsanip: 10.10.21.11, vmotionip: 10.10.22.11 }
+    - { host: sb-esxi-02.vclass.local, vsanip: 10.10.21.12, vmotionip: 10.10.22.12 }
+    - { host: sb-esxi-03.vclass.local, vsanip: 10.10.21.13, vmotionip: 10.10.22.13 }
+    - { host: sb-esxi-04.vclass.local, vsanip: 10.10.21.14, vmotionip: 10.10.22.14 }
+    DSwitch_SB_PG:
+    - { pgname: DPG-SB-vSAN, vlan: 21 }
+    - { pgname: DPG-SB-vMotion, vlan: 22 }
+    - { pgname: DPG-SB-Prod, vlan: 23 }
+    
+  tasks: 
+    - name: 01.Create Cluster
+      community.vmware.vmware_cluster:
+        hostname: '{{ vcenter_hostname }}'
+        username: '{{ vcenter_username }}'
+        password: '{{ vcenter_password }}'
+        validate_certs: no
+        datacenter_name: '{{ datacenter_name }}'
+        cluster_name: '{{ cluster_name }}'
+      delegate_to: localhost
+
+    - name: 02.Add ESXi Host to vCenter
+      community.vmware.vmware_host:
+        hostname: '{{ vcenter_hostname }}'
+        username: '{{ vcenter_username }}'
+        password: '{{ vcenter_password }}'
+        validate_certs: no
+        datacenter_name: '{{ datacenter_name }}'
+        cluster_name: '{{ cluster_name }}'
+        esxi_hostname: '{{ item.host }}'
+        esxi_username: 'root'
+        esxi_password: 'VMware1!'
+        state: present
+      loop: "{{ SiteB_vSAN_Cluster }}"
+      delegate_to: localhost
+
+    - name: 03.Add Host to dVS
+      community.vmware.vmware_dvs_host:
+        hostname: '{{ vcenter_hostname }}'
+        username: '{{ vcenter_username }}'
+        password: '{{ vcenter_password }}'
+        validate_certs: no        
+        esxi_hostname: '{{ item.host }}'
+        switch_name: DSwitch
+        vmnics:
+          - vmnic2
+          - vmnic3
+        state: present
+      loop: "{{ SiteB_vSAN_Cluster }}"
+      delegate_to: localhost
+
+
+    - name: 04.Create Distributed Port Group for Site B
+      community.vmware.vmware_dvs_portgroup:
+        hostname: '{{ vcenter_hostname }}'
+        username: '{{ vcenter_username }}'
+        password: '{{ vcenter_password }}'
+        validate_certs: no        
+        portgroup_name: '{{ item.pgname }}'
+        switch_name: DSwitch
+        vlan_id: '{{ item.vlan }}'
+        port_binding: static
+        state: present
+      loop: "{{ DSwitch_SB_PG }}"      
+      delegate_to: localhost
+
+
+    - name: 05.Add vSAN vmkernel adpater
+      community.vmware.vmware_vmkernel:
+        hostname: '{{ vcenter_hostname }}'
+        username: '{{ vcenter_username }}'
+        password: '{{ vcenter_password }}'
+        validate_certs: no
+        esxi_hostname: '{{ item.host }}'
+        dvswitch_name: DSwitch
+        portgroup_name: DPG-SB-vSAN
+        network:
+          type: 'static'
+          ip_address: '{{ item.vsanip }}'
+          subnet_mask: 255.255.255.0
+        state: present
+        enable_vsan: yes
+      loop: "{{ SiteB_vSAN_Cluster }}"
+      delegate_to: localhost
+
+
+    - name: 06.Add vMotion vmkernel port
+      community.vmware.vmware_vmkernel:
+        hostname: '{{ vcenter_hostname }}'
+        username: '{{ vcenter_username }}'
+        password: '{{ vcenter_password }}'
+        validate_certs: no
+        esxi_hostname: '{{ item.host }}'
+        dvswitch_name: DSwitch
+        portgroup_name: DPG-SB-vMotion
+        network:
+          type: 'static'
+          ip_address: '{{ item.vmotionip }}'
+          subnet_mask: 255.255.255.0
+          tcpip_stack: vmotion
+        state: present
+        enable_vmotion: yes
+      loop: "{{ SiteB_vSAN_Cluster }}"
+      delegate_to: localhost
+
+
+    - name: 07.vmoption tcp/ip stack gateway
+      community.vmware.vmware_host_tcpip_stacks:
+        hostname: '{{ item.host }}'
+        username: '{{ esxi_username }}'
+        password: '{{ esxi_password }}'
+        validate_certs: no
+        esxi_hostname: '{{ item.host }}'        
+        vmotion:
+          gateway: 10.10.22.1
+      loop: "{{ SiteB_vSAN_Cluster }}"
+      delegate_to: localhost    
+
+
+    - name: 08.Enable vSAN
+      community.vmware.vmware_cluster_vsan:
+        hostname: '{{ vcenter_hostname }}'
+        username: '{{ vcenter_username }}'
+        password: '{{ vcenter_password }}'
+        validate_certs: no
+        datacenter_name: '{{ datacenter_name }}'
+        cluster_name: '{{ cluster_name }}'
+        enable: true
+        vsan_auto_claim_storage: true
+      delegate_to: localhost
+      
