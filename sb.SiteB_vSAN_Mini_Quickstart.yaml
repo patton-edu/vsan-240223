@@ -8,7 +8,7 @@
     vcenter_username: "administrator@vsphere.local"
     vcenter_password: "VMware1!"
     datacenter_name: "Datacenter"
-    cluster_name: "SiteB"
+    cluster_name: "SiteA"
     esxi_username: "root"
     esxi_password: "VMware1!"
     SiteB_vSAN_Cluster:
@@ -22,15 +22,15 @@
     - { pgname: DPG-SB-Prod, vlan: 23 }
     
   tasks: 
-    - name: 01.Create Cluster
-      community.vmware.vmware_cluster:
-        hostname: '{{ vcenter_hostname }}'
-        username: '{{ vcenter_username }}'
-        password: '{{ vcenter_password }}'
-        validate_certs: no
-        datacenter_name: '{{ datacenter_name }}'
-        cluster_name: '{{ cluster_name }}'
-      delegate_to: localhost
+#    - name: 01.Create Cluster
+#      community.vmware.vmware_cluster:
+#        hostname: '{{ vcenter_hostname }}'
+#        username: '{{ vcenter_username }}'
+#        password: '{{ vcenter_password }}'
+#        validate_certs: no
+#        datacenter_name: '{{ datacenter_name }}'
+#        cluster_name: '{{ cluster_name }}'
+#      delegate_to: localhost
 
     - name: 02.Add ESXi Host to vCenter
       community.vmware.vmware_host:
@@ -91,6 +91,7 @@
           type: 'static'
           ip_address: '{{ item.vsanip }}'
           subnet_mask: 255.255.255.0
+          default_gateway: 10.10.21.1
         state: present
         enable_vsan: yes
       loop: "{{ SiteB_vSAN_Cluster }}"
@@ -130,15 +131,15 @@
       delegate_to: localhost    
 
 
-    - name: 08.Enable vSAN
-      community.vmware.vmware_cluster_vsan:
-        hostname: '{{ vcenter_hostname }}'
-        username: '{{ vcenter_username }}'
-        password: '{{ vcenter_password }}'
-        validate_certs: no
-        datacenter_name: '{{ datacenter_name }}'
-        cluster_name: '{{ cluster_name }}'
-        enable: true
-        vsan_auto_claim_storage: true
-      delegate_to: localhost
+#    - name: 08.Enable vSAN
+#      community.vmware.vmware_cluster_vsan:
+#        hostname: '{{ vcenter_hostname }}'
+#        username: '{{ vcenter_username }}'
+#        password: '{{ vcenter_password }}'
+#        validate_certs: no
+#        datacenter_name: '{{ datacenter_name }}'
+#        cluster_name: '{{ cluster_name }}'
+#        enable: true
+#        vsan_auto_claim_storage: true
+#      delegate_to: localhost
       
